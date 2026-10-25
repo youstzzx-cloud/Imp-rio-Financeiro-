@@ -1,0 +1,65 @@
+
+name: Publicar site no GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - principal
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar arquivos
+        uses: actions/checkout@v4
+
+      - name: Extrair ZIP e preparar site
+        run: |
+          set -e
+          mkdir -p temporario _site
+
+          ZIP=$(find . -maxdepth 1 -iname "*.zip" -print -quit)
+          if [ -z "$ZIP" ]; then
+            echo "Nenhum ZIP encontrado na raiz do repositorio."
+            exit 1
+          fi
+
+          unzip -o "$ZIP" -d temporario
+
+          SITEZIP=$(find temporario -type f -iname "imperio-financeiro.zip" -print -quit)
+
+          if [ -n "$SITEZIP" ]; then
+            unzip -o "$SITEZIP" -d _site
+          else
+            INDEX=$(find temporario -type f -name "index.html" -print -quit)
+            if [ -z "$INDEX" ]; then
+              echo "Nao encontrei index.html nem imperio-financeiro.zip."
+              exit 1
+            fi
+            cp -a "$(dirname "$INDEX")"/. _site/
+          fi
+
+          test -f _site/index.html
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Preparar arquivos para publicacao
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Publicar site
+        uses: actions/deploy-pages@v4
+        
